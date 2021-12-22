@@ -1,0 +1,13 @@
+**/target
+**/.metals
+**/.vscode
+**/.bsp
+project/project
+.RData
+.Rhistory
+.Rproj.user
+collectionsim.Rproj
+renv
+renv.lock
+.Rprofile
+R
