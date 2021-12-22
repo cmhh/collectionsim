@@ -1,6 +1,6 @@
 # Household Collection Simulation using Akka
 
-This repository contains a rough agent-based simulation of a household survey using [Akka](https://akka.io).  Akka is an actor system implementation for the JVM.  A more detailed slideshow can be found in teh `doc` subdirectory of this repository.
+This repository contains a rough agent-based simulation of a household survey using [Akka](https://akka.io).  Akka is an actor system implementation for the JVM.  A more detailed slideshow can be found in the `doc` subdirectory of this repository.
 
 ## Installation
 
@@ -15,6 +15,12 @@ which will create a fat jar in the folder:
 ```plaintext
 target/scala-2.13/collectionsim.jar
 ```
+
+The service also requires an [Open Source Routing Machine](http://project-osrm.org/) instance to find optimal paths between collectors and sample addresses, along with drivetime and distance.  A basic setup can be run locally via Docker, and an example is provided here:
+
+[cmhh/osrm-backend-nz](https://github.com/cmhh/osrm-backend-nz)
+
+If OSRM is not available, routes will be approximated using a straight line, with the distance scaled up by a factor of 1.35.
 
 ## Usage
 
