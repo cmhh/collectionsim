@@ -5,10 +5,23 @@ import java.net.{URL, HttpURLConnection}
 import com.typesafe.config.ConfigFactory
 import upickle.default._
 
+/**
+ * Calculate trips and routes
+ */
 object Router {  
   private val conf = ConfigFactory.load()
   private val routingService = conf.getString("routing.url")
 
+  /**
+   * Route between two locations
+   * 
+   * Estimate based on straight line which can be used if OSRM is unavailable.
+   * 
+   * @param origin [[Coordinates]]
+   * @param destination [[Coordinates]]
+   * @param aveSpeed Average speed for estimating time from distance
+   * @return tuple containing distance (metres) and time (seconds)
+   */
   def route0(
     origin: Coordinates,
     destination: Coordinates,
@@ -18,6 +31,17 @@ object Router {
     (d, d / 1000 / aveSpeed * 60 * 60)
   }
 
+  /**
+   * Route between two locations
+   * 
+   * Call open source routing machine and extract time and distance.
+   * 
+   * @param origin [[Coordinates]]
+   * @param destination [[Coordinates]]
+   * @param connectTimeout connection timeout
+   * @param readTimeout read timeout
+   * @return tuple containing distance (metres) and time (seconds)
+   */
   def route(
     origin: Coordinates, 
     destination: Coordinates,
@@ -43,7 +67,7 @@ object Router {
   /**
    * Naive greedy trip solution
    * 
-   * Useful for smoke tests, or if routing service is unavailable / overwhelmed.
+   * Useful if routing service is unavailable / overwhelmed.
    * 
    * @param coordinates Set of coordinates, with origin at start
    * @return List of tuples containing each leg of overall trip--coordinate pairs, distance, and minutes.
@@ -70,6 +94,16 @@ object Router {
     res :+ (res.last._2, coordinates.head, d._1, d._2)
   }
 
+  /**
+   * Trip solution
+   * 
+   * Call open source routing machine and extract times and distances of each leg.
+   * 
+   * @param coordinates Set of coordinates, with origin at start
+   * @param connectTimeout connection timeout
+   * @param readTimeout read timeout
+   * @return List of tuples containing each leg of overall trip--coordinate pairs, distance, and minutes.
+   */
   def trip(
     coordinates: Seq[Coordinates],
     connectTimeout: Int = 5000,
@@ -92,6 +126,17 @@ object Router {
     od.zip(dd).toList.map(x => (x._1._1, x._1._2, x._2._1, x._2._2))
   } 
 
+  /**
+   * Trip solution
+   * 
+   * Call open source routing machine and extract times and distances of each leg.
+   * 
+   * @param origin starting (and ending) location
+   * @param coordinates Set of coordinates, with origin at start
+   * @param connectTimeout connection timeout
+   * @param readTimeout read timeout
+   * @return List of tuples containing each leg of overall trip--coordinate pairs, distance, and minutes.
+   */
   def trip(
     origin: Coordinates,
     destinations: Seq[Coordinates],
@@ -100,42 +145,3 @@ object Router {
   ): Try[List[(Coordinates, Coordinates, Double, Double)]] = 
     trip(origin +: destinations, connectTimeout, readTimeout)
 }
-
-/*
-
-import org.cmhh._
-
-val origin = Coordinates(174.14842652,-35.63495896)
-val p1 = Coordinates(174.2380,-35.74954)
-val p2 = Coordinates(174.2331,-35.75471)
-val p3 = Coordinates(174.2446,-35.75021)
-val p4 = Coordinates(174.2401,-35.75146)
-val p5 = Coordinates(174.2457,-35.75738)
-
-val coordinates = origin :: List(p1, p2, p3, p4, p5)
-
-val path = Router.trip(coordinates)
-path.foreach(x => x.foreach(println))
-
-private val conf = ConfigFactory.load()
-private val routingService = conf.getString("routing.url")
-
-val connectTimeout = 5000
-val readTimeout = 5000
-val coords = coordinates.map(_.toString).mkString(";")
-val service = s"${routingService}/trip/v1/driving/$coords"
-val par = s"""skip_waypoints=true&overview=false&source=first&""" + 
-  s"""approaches=${coordinates.map(i => "curb").mkString(";")}"""
-val url = s"$service?$par"
-val conn = (new URL(url)).openConnection
-conn.setConnectTimeout(connectTimeout)
-conn.setReadTimeout(readTimeout)
-val is = conn.getInputStream
-val content = io.Source.fromInputStream(is).mkString
-
-
-val route = Router.route(coordinates)
-
-
-val url = "https://cmhh.hopto.org/osrm/trip/v1/driving/174.14842652,-35.63495896;174.2380,-35.74954;174.2331,-35.75471;174.2446,-35.75021;174.2401,-35.75146;174.2457,-35.75738?source=first&destination=any&approaches=curb;curb;curb;curb;curb;curb"
-*/

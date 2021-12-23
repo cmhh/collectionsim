@@ -16,6 +16,12 @@ which will create a fat jar in the folder:
 target/scala-2.13/collectionsim.jar
 ```
 
+Note there's an issue with the JDBC interface using JDK 9 or above when using the REPL which I haven't resolved.  If wishing to run this interactively, start sbt with JDK 8.  On Ubuntu, this would be something like:
+
+```bash
+sbt -java-home /usr/lib/jvm/java-1.8.0-openjdk-amd64
+```
+
 The service also requires an [Open Source Routing Machine](http://project-osrm.org/) instance to find optimal paths between collectors and sample addresses, along with drivetime and distance.  A basic setup can be run locally via Docker, and an example is provided here:
 
 [cmhh/osrm-backend-nz](https://github.com/cmhh/osrm-backend-nz)

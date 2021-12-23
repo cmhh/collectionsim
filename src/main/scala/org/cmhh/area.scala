@@ -1,5 +1,8 @@
 package org.cmhh
 
+/**
+ * Collection areas.
+ */
 object area {
   sealed trait Area
   case object UPPERNORTH extends Area {val codes = List("01", "02")}
@@ -13,6 +16,12 @@ object area {
     UPPERNORTH, CENTRALNORTH, LOWERNORTH, UPPERSOUTH, CENTRALSOUTH, LOWERSOUTH
   )
 
+  /**
+   * Return collection area given regional council code.
+   * 
+   * @param region regional council code
+   * @return [[Area]]
+   */
   def get(region: String): Area = region match {
     case "01" => UPPERNORTH
     case "02" => UPPERNORTH

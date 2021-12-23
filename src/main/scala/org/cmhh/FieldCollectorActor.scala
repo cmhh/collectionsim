@@ -2,14 +2,26 @@ package org.cmhh
 
 import akka.actor.typed.scaladsl.{Behaviors, LoggerOps, ActorContext}
 import akka.actor.typed.{ActorRef, Behavior}
-import akka.pattern.ask
 import java.io.File
 import java.time.LocalDateTime
 import scala.util.{Try, Success, Failure}
 
+/**
+ * Field collector
+ * 
+ * Responsible for contacting and interviewing dwellings and individuals.
+ */
 object FieldCollectorActor {
   import messages._
 
+  /**
+   * Actor behavior
+   * 
+   * @param id unique ID
+   * @param address address string
+   * @param location location of address
+   * @param eventRecorder reference for system event recorder, used for persistent logging.
+   */
   def apply(
     id: Int, address: String, location: Coordinates, eventRecorder: ActorRef[EventRecorderCommand]
   ): Behavior[FieldCollectorCommand] = Behaviors.setup { context => 
@@ -24,21 +36,24 @@ private class FieldCollectorActor (
 ) {    
   import messages._
 
+  /**
+   * Actor behavior
+   * 
+   * @param config [[FieldCollectorConfig]]
+   */
   def behavior(
     config: FieldCollectorConfig 
   ): Behavior[FieldCollectorCommand] = Behaviors.receiveMessage { message => 
     message match {
-      case CountCases => 
-        if (config.cases.size > 0) println(s"""[${context.self}] - I have ${config.cases.size} cases.""")
-        Behaviors.same
-      case CountResidents =>
-        config.cases.keys.foreach(x => x ! CountResidents)
-        Behaviors.same
+      // spawn a new dwelling
       case m: Dwelling =>
         val dwelling = context.spawn(DwellingActor(m.id, m.address, m.location, eventRecorder), s"""dwelling@${m.id}""")
         eventRecorder ! DwellingRecord(dwelling.toString, m.id, m.address, m.location, m.area)
         eventRecorder ! DwellingAssignment(dwelling.toString, context.self.toString)
         behavior(config.addDwelling(dwelling, m))
+      // simulate a day of work
+      // get outstanding cases, and place them in appropriate driving order.
+      // contact sorted cases one-by-one, send a NextCase message to self after each is completed.
       case RunDay(dt) =>
         val activeCases: List[ActorRef[DwellingCommand]] = config.getActiveDwellings
         if (activeCases.size == 0) Behaviors.same else {
@@ -73,6 +88,9 @@ private class FieldCollectorActor (
         val newtime: LocalDateTime = config.time.map(_.plusSeconds(60 * 1)).get
         context.self ! NextItem(newtime)
         behavior(config.setDwellingVacant(ref))
+      // a dwelling will be vacant or not.  if vacant, move to next case.
+      // if a dwelling is not vacant, the dwelling will reply with the list of individuals
+      // the individuals will then be contacted one-by-one before moving to the next case.
       case DwellingResponse(ref, response, cases) =>
         eventRecorder ! Interview(context.self.toString, ref.toString, ref.toString, config.time.get, "RESPONSE")
         eventRecorder ! DwellingData(context.self.toString, response)
@@ -139,6 +157,9 @@ private class FieldCollectorActor (
             .popIndividual(ref)
             .setTime(newtime)
         )
+      // send a request to the next case in the list of work items.
+      // included in the request is an estimated arrivale time--
+      // we calculate the drive time from current location to next, and add to current time.
       case NextItem(datetime) =>
         if (config.workload.size == 0 | datetime.getHour >= 18) {
           config.getLocation match {
@@ -156,7 +177,6 @@ private class FieldCollectorActor (
           val nxt = workloadItem._3
           val eta: LocalDateTime = datetime.plusSeconds(workloadItem._2.toLong)
 
-          //log the trip
           val origin = config.currentDwelling match {
             case Some(ref) => config.getLocation(ref)
             case _ => location
@@ -186,6 +206,7 @@ private class FieldCollectorActor (
             )
           }
         }
+      // clear workload, and calculate the route home.
       case GoHome(datetime, currentLocation) =>
         val route = Router.route(currentLocation, location) match {
           case Success(r) => r

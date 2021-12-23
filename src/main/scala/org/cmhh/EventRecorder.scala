@@ -7,7 +7,18 @@ import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
+/**
+ * Event recorder.
+ * 
+ * Responsible for saving collection paradata and other information in a persistent database.
+ */
 object EventRecorder {
+  /**
+   * Actor behavior
+   * 
+   * @param path path to database
+   * @param batchSize number of SQL queries to accumulate before execution
+   */
   def apply(path: String, batchSize: Int): Behavior[messages.EventRecorderCommand] = Behaviors.setup{ context => 
     new EventRecorder(path, batchSize, context).behavior(List.empty)
   }
@@ -22,9 +33,9 @@ private class EventRecorder (path: String, batchSize: Int, context: ActorContext
   }
 
   Class.forName("org.sqlite.JDBC")
-  val conn = DriverManager.getConnection(s"jdbc:sqlite:$path")
+  private val conn = DriverManager.getConnection(s"jdbc:sqlite:$path")
   conn.setAutoCommit(false)
-  val stmt = conn.createStatement()
+  private val stmt = conn.createStatement()
 
   stmt.execute(
     """
@@ -86,6 +97,14 @@ private class EventRecorder (path: String, batchSize: Int, context: ActorContext
 
   conn.commit()
 
+  /**
+   * Actor behavior
+   * 
+   * Messages generally correpsond to a specific database table.  Queries are
+   * saved up until the batch size is reached, then all queries are executed.
+   * Queries can be run manually--in case the simulation is finished and 
+   * unevaluated queries remain.
+   */
   def behavior(queries: List[String]): Behavior[EventRecorderCommand] = Behaviors.receiveMessage { message => 
     message match {
       case CollectorRecord(ref, id, address, location, area) =>
@@ -131,7 +150,21 @@ private class EventRecorder (path: String, batchSize: Int, context: ActorContext
     }
   }
 
+  /**
+   * Handle single quotes in SQL queries.
+   * 
+   * @param str input string
+   * @return string
+   */
   private def q(str: String) = str.replaceAll("'", "''")
+
   private val fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+
+  /**
+   * Standardise string format of dates.
+   * 
+   * @param dt datetime
+   * @return string
+   */
   private def d(dt: LocalDateTime): String = dt.format(fmt)
 }

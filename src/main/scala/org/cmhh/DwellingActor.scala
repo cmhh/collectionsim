@@ -6,10 +6,22 @@ import java.io.File
 import sex._
 import demographics._
 import java.time.LocalDate
-
+/**
+ * Dwelling actor.
+ * 
+ * Responsible for spawing individuals.
+ */
 object DwellingActor {
   import messages._
 
+  /**
+   * Actor behavior
+   * 
+   * @param id unique dwelling ID
+   * @param address address string
+   * @param location Coordinates
+   * @param eventRecorder reference for system event recorder, used for persistent logging.
+   */
   def apply(
     id: Int, address: String, location: Coordinates, eventRecorder: ActorRef[EventRecorderCommand]
   ): Behavior[DwellingCommand] = Behaviors.setup{context =>
@@ -24,36 +36,46 @@ private class DwellingActor(
 ) {
   import messages._
 
+  /**
+   * Placeholder for household-level questionnaire.
+   */
   override def toString = random.string(50)
 
-  val residents: List[ActorRef[IndividualCommand]] = 
+  private val residents: List[ActorRef[IndividualCommand]] = 
       if (scala.util.Random.nextDouble() < 0.1) List.empty else spawnResidents(context)
 
-  private def behavior(responded: Boolean): Behavior[DwellingCommand] = {
-    Behaviors.receiveMessage { message =>
-      message match {
-        case CountResidents =>
-          println(s"""[${context.self}] - I contain ${residents.size} residents.""")
+  /**
+   * Actor behavior
+   * 
+   * @param respondent whether the actor has successfully responded or not.
+   */
+  private def behavior(responded: Boolean): Behavior[DwellingCommand] = Behaviors.receiveMessage { message =>
+    message match {
+      // respond to request for interview
+      case m: AttemptInterview =>
+        val r = scala.util.Random.nextDouble()
+        if (residents.size == 0) {
+          // assume we can identify empty dwellings with certainty.
+          // not reasonable in practice, but...
+          m.replyTo ! DwellingEmpty(context.self)
           Behaviors.same
-        case m: AttemptInterview =>
-          val r = scala.util.Random.nextDouble()
-          if (residents.size == 0) {
-            m.replyTo ! DwellingEmpty(context.self)
-            Behaviors.same
-          }
-          else if (r < 0.1) {
-            m.replyTo ! DwellingRefusal(context.self)
-            Behaviors.same
-          }
-          else if (r < 0.3) {
-            m.replyTo ! DwellingNoncontact(context.self)
-            Behaviors.same
-          } 
-          else {
-            m.replyTo ! DwellingResponse(context.self, toString, residents)
-            behavior(true)
-          }
-      }
+        }
+        else if (r < 0.1) {
+          // refuse with prob 0.1
+          m.replyTo ! DwellingRefusal(context.self)
+          Behaviors.same
+        }
+        else if (r < 0.3) {
+          // non-contact with prob 0.2
+          m.replyTo ! DwellingNoncontact(context.self)
+          Behaviors.same
+        } 
+        else {
+          // respond with prob 0.7
+          // send 'completed questionnaire', and pointers to each individual to area coordinator
+          m.replyTo ! DwellingResponse(context.self, toString, residents)
+          behavior(true)
+        }
     }
   }
 

@@ -4,16 +4,15 @@ import akka.actor.typed.ActorRef
 import java.time.{LocalDate, LocalDateTime}
 import area._
 
+/**
+ * Message interface
+ */
 object messages {
   // -> coordinator
   sealed trait CoordinatorCommand 
-  case object ListAreaCoordinators extends CoordinatorCommand
-  case object CountAreaCoordinators extends CoordinatorCommand
 
   // -> area coordinators
   sealed trait AreaCoordinatorCommand
-  case class Distance(distance: Double) extends AreaCoordinatorCommand
-  case class Workload(numCases: Int) extends AreaCoordinatorCommand
 
   // -> field collector
   sealed trait FieldCollectorCommand
@@ -38,16 +37,10 @@ object messages {
 
   // -> coordinator -> area coordinator
   case class FieldCollector(id: Int, address: String, location: Coordinates, area: String) extends CoordinatorCommand with AreaCoordinatorCommand
-  case object ListFieldCollectors extends CoordinatorCommand with AreaCoordinatorCommand
-  case object CountFieldCollectors extends CoordinatorCommand with AreaCoordinatorCommand
 
   // -> coordinator -> area coordinator -> field collector
   case class Dwelling(id: Int, address: String, location: Coordinates, area: String) extends CoordinatorCommand with AreaCoordinatorCommand with FieldCollectorCommand
-  case object CountCases extends CoordinatorCommand with AreaCoordinatorCommand with FieldCollectorCommand 
   case class RunDay(datetime: LocalDateTime) extends CoordinatorCommand with AreaCoordinatorCommand with FieldCollectorCommand 
-
-  // coordinator -> area coordinator -> field collector -> dwelling
-  case object CountResidents extends CoordinatorCommand with AreaCoordinatorCommand with FieldCollectorCommand with DwellingCommand
 
   // -> event recorder
   sealed trait EventRecorderCommand

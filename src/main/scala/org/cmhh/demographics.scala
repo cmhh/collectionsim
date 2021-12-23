@@ -2,7 +2,14 @@ package org.cmhh
 
 import scala.util.Random
 
+/**
+ * Demographic characteristics of households / dwellings
+ */
 object demographics {
+  
+  /**
+   * Household type.
+   */
   sealed trait HhType{val prob: Double}
   case object OnePersonHH extends HhType{val prob: Double = 0.227441234181339}
   case object OneFamilyHH extends HhType{val prob: Double = 0.686168716018560}
@@ -11,6 +18,9 @@ object demographics {
 
   private val hhtypes = List(OnePersonHH, OneFamilyHH, TwoFamilyHH, OtherMultHH)
 
+  /**
+   * Return a random household type according to known distribution.
+   */
   def randomHhType: HhType = {
     val r = Random.nextDouble()
     def loop(hhtypes: Seq[HhType] = hhtypes, accum: Double = 0): HhType = hhtypes match {
@@ -22,6 +32,9 @@ object demographics {
     loop()
   }
 
+  /**
+   * Family type.
+   */
   sealed trait FamType{val prob: Double}
   case object CoupleOnly extends FamType{val prob: Double = 0.372531912434152}
   case object CoupleOnlyAndOthers extends FamType{val prob: Double = 0.037557315777596}
@@ -35,6 +48,9 @@ object demographics {
     OneParentWithChildren, OneParentWithChildrenAndOthers
   )
 
+  /**
+   * Return a random family type according to known distribution.
+   */
   def randomFamType: FamType = {
     val r = Random.nextDouble()
     def loop(famtypes: Seq[FamType] = famtypes, accum: Double = 0): FamType = famtypes match {

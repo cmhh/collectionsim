@@ -20,7 +20,7 @@ object load {
    * @param addressCol column holding address string
    * @param longitudeCol column holding longitude, i.e. EPSG: 4326
    * @param latitudeCol column holding latitude, i.e. EPSG: 4326
-   * @param regionCOl column holding 'region'--used to assign potential actors to the correct AreaCoordinator
+   * @param regionCol column holding 'region'--used to assign potential actors to the correct AreaCoordinator
    */
   case class CsvConfig(idCol: String, addressCol: String, longitudeCol: String, latitudeCol: String, regionCol: String)
 
@@ -30,7 +30,7 @@ object load {
   implicit val conf = CsvConfig("address_id", "full_address", "gd2000_xcoord", "gd2000_ycoord", "region")
 
   /**
-   * Produce [[FieldCollector]] iterator from CSV file.
+   * Produce [[messages.FieldCollector]] iterator from CSV file.
    * 
    * @param file file name
    * @param conf [[CsvConfig]]
@@ -55,7 +55,7 @@ object load {
     /**
      * Return next record
      * 
-     * @return [[FieldCollector]]
+     * @return [[messages.FieldCollector]]
      */
     def next(): FieldCollector = {
       val row = it.next()
@@ -69,7 +69,7 @@ object load {
   }
 
   /**
-   * Produce [[Dwelling]] iterator from CSV file.
+   * Produce [[messages.Dwelling]] iterator from CSV file.
    * 
    * @param file file name
    * @param conf [[CsvConfig]]
@@ -94,7 +94,7 @@ object load {
     /**
      * Return next record
      * 
-     * @return [[Dwelling]]
+     * @return [[messages.Dwelling]]
      */
     def next(): Dwelling = {
       val row = it.next()
