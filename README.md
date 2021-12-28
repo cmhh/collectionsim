@@ -2,6 +2,18 @@
 
 This repository contains a rough agent-based simulation of a household survey using [Akka](https://akka.io).  Akka is an actor system implementation for the JVM.  A more detailed slideshow can be found in the `doc` subdirectory of this repository.
 
+## Data
+
+The project includes code to output random names, in turn dependent on bundled lists of names.  Those files, and their original source, are as follows:
+
+file                   | source
+-----------------------|--------
+`dist.all.last.gz`     | [Frequently Occurring Surnames from the 2010 Census](https://www.census.gov/topics/population/genealogy/data/2010_surnames.html)
+`dist.male.first.gz`   | [Social Security - Beyond the Top 1000 Names](https://www.ssa.gov/oact/babynames/names.zip)
+`dist.female.first.gz` | [Social Security - Beyond the Top 1000 Names](https://www.ssa.gov/oact/babynames/names.zip)
+
+In each case, the names have been sorted in descending order of frequency, and the frequencies themselves have been converted to overall proportions, and cumulative proportions (so names can be selected probability proportional to size).
+
 ## Installation
 
 The project is written in Scala and requires [sbt](https://www.scala-sbt.org/) to be built.  Simply run:
@@ -16,6 +28,62 @@ which will create a fat jar in the folder:
 target/scala-2.13/collectionsim.jar
 ```
 
+There are a number of parameters controlled by configuration, using `https://github.com/lightbend/config`, controlled by `./src/main/resources/application.conf`, which essentially contains defaults.  The relevant variables are as follows:
+
+```hocon
+router-settings {
+  url = "http://localhost:5001"
+  connect-timeout = 10
+  read-timeout = 10
+  average-speed = 37
+  rateup = 2.0
+}
+
+dwelling-settings {
+  prob-vacant = 0.1
+}
+
+collection-settings {
+  household {
+    prob-empty = 0.1
+    prob-refusal = 0.1
+    prob-noncontact = 0.2
+    prob-response = 0.7
+    duration-mean = 6
+    duration-stdev = 1
+  }
+  individual {
+    prob-refusal = 0.1
+    prob-noncontact = 0.2
+    prob-response = 0.7
+    duration-mean = 6
+    duration-stdev = 1
+  }
+}
+
+demographic-settings {
+  proportion-male = 0.5
+  max-age = 120
+  min-age-couple = 18
+  household-type {
+    one-person = 0.227441234181339
+    one-family = 0.686168716018560
+    two-family = 0.035188671940655
+    other-mult = 0.051201377859446
+  }
+  family-type {
+    couple-only = 0.372531912434152
+    couple-only-and-others = 0.037557315777596
+    couple-with-children = 0.398532495912896
+    couple-with-children-and-others = 0.037309612537087
+    one-parent-with-children = 0.124743351920251
+    one-parent-with-children-and-others = 0.029325311418019
+  }
+}
+```
+
+Default parameters can be overridden on a case-by-case basis by passing `-Dparameter=value` in the usual way.
+
 Note there's an issue with the JDBC interface using JDK 9 or above when using the REPL which I haven't resolved.  If wishing to run this interactively, start sbt with JDK 8.  On Ubuntu, this would be something like:
 
 ```bash
@@ -26,7 +94,7 @@ The service also requires an [Open Source Routing Machine](http://project-osrm.o
 
 [cmhh/osrm-backend-nz](https://github.com/cmhh/osrm-backend-nz)
 
-If OSRM is not available, routes will be approximated using a straight line, with the distance scaled up by a factor of 1.35.
+If OSRM is not available, routes will be approximated using a straight line, with the distance scaled up by a factor (default of 2.0).
 
 ## Usage
 
@@ -76,6 +144,10 @@ This will produce a SQLite database named `collectionsim.db` which can be opened
 
 ![](img/collectionsim02.png)
 
+N.b. that it is easy to make things go wrong.  In particular, if a new `RunDay` message is sent before the previous day has been fully simulated, then some unusual behaviour will be observed.  Things are actually fast, but appealing to an external routing service can cause things to take longer than expected.
+
+## Analysing Output
+
 The repository contains two test databases, `collectionsim1.db` and `collectionsim2.db`, which are the result of running a simulation with `data/sample1_01.csv.gz` and `data/sample2_01.csv.gz` as inputs, respectively--so one clustered, and the other unclustered.  We could query these in R:
 
 ```r
@@ -93,7 +165,7 @@ DBI::dbDisconnect(db1)
 DBI::dbDisconnect(db2)
 ```
 ```plaintext
-[1] 1.442284
+[1] 1.52259
 ```
 
 More examples to come...

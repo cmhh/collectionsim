@@ -2,8 +2,9 @@ package org.cmhh
 
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors, LoggerOps}
 import akka.actor.typed.{ActorRef, Behavior}
+import com.typesafe.config.Config
 import java.time.LocalDate
-import sex._
+import categories._
 
 /**
  * Individual actor
@@ -11,6 +12,8 @@ import sex._
  * Represents an individual.  Can respond to requests from a field collector.
  */
 object IndividualActor {
+  import implicits.conf
+
   /**
    * Actor behavior
    * 
@@ -31,7 +34,7 @@ object IndividualActor {
 private class IndividualActor(
   first: String, last: String, dob: LocalDate, sex: Sex, 
   parent: ActorRef[messages.DwellingCommand], context: ActorContext[messages.IndividualCommand]
-) {
+)(implicit val conf: Config) {
   import messages._
 
   override def toString = 
@@ -46,17 +49,19 @@ private class IndividualActor(
     message match {
       case m: AttemptInterview =>
         val r = scala.util.Random.nextDouble()
-        if (r < 0.1) {
-          // refuse with probability 0.1
+        val p = Vector(
+          conf.getDouble("collection-settings.individual.prob-refusal"),
+          conf.getDouble("collection-settings.individual.prob-noncontact"),
+          conf.getDouble("collection-settings.individual.prob-response")
+        ).scanLeft(0.0)(_ + _).drop(1)
+        if (r < p(0)) {
           m.replyTo ! IndividualRefusal(context.self, parent)
           behavior(true)
         } 
-        else if (r < 0.3) {
-          // non-contact with probability 0.2
+        else if (r < p(1)) {
           m.replyTo ! IndividualNoncontact(context.self, parent)
           behavior(false)
         } else {
-          // respond with probability 0.7
           m.replyTo ! IndividualResponse(context.self, parent, toString)
           behavior(true)
         }

@@ -2,6 +2,7 @@ package org.cmhh
 
 import akka.actor.typed.scaladsl.{Behaviors, LoggerOps, ActorContext}
 import akka.actor.typed.{ActorRef, Behavior}
+import com.typesafe.config.Config
 import java.io.File
 import scala.util.{Try, Success, Failure}
 
@@ -13,6 +14,7 @@ import scala.util.{Try, Success, Failure}
  */
 object AreaCoordinator {
   import messages._
+  import implicits.{router, conf}
   
   /**
    * Actor behavior
@@ -27,8 +29,13 @@ object AreaCoordinator {
 private class AreaCoordinator(
   eventRecorder: ActorRef[messages.EventRecorderCommand],
   context: ActorContext[messages.AreaCoordinatorCommand]
-) {
+)(implicit val router: Router, conf: Config) {
   import messages._
+
+  private val CONNECT_TIMEOUT = conf.getInt("router-settings.connect-timeout")
+  private val READ_TIMEOUT = conf.getInt("router-settings.read-timeout")
+  private val AVE_SPEED = conf.getDouble("router-settings.average-speed")
+  private val RATEUP = conf.getDouble("router-settings.rateup")
 
   /**
    * Actor behavior
@@ -52,9 +59,9 @@ private class AreaCoordinator(
         val available1 = collectors.filter(collector => workloads(collector._1) < 50)
         val available2 = if (available1.size > 0) available1 else collectors
         val distances = available2.map(collector => {
-          val d = Router.route(m.location, collector._2.location, 20, 20) match {
+          val d = router.route(m.location, collector._2.location, CONNECT_TIMEOUT, READ_TIMEOUT) match {
             case Success(x) => x._1
-            case Failure(e) => Router.route0(m.location, collector._2.location)._1
+            case Failure(e) => router.route0(m.location, collector._2.location, AVE_SPEED, RATEUP)._1
           }
           (collector._1, d)
         }).toMap

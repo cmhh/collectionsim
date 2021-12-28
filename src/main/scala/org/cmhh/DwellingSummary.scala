@@ -16,6 +16,7 @@ case class Monitor[T](
   def respond: Monitor[T] = Monitor(ref, noncontacts, false, true, phone)
   def close: Monitor[T] = Monitor(ref, noncontacts, false, true, phone)
   def addPhone(ph: String): Monitor[T] = Monitor(ref, noncontacts, refused, complete, Some(ph))
+  override def toString: String = s"""ref: $ref, complete: $complete"""
 }
 
 case object Monitor {
@@ -33,6 +34,11 @@ case class DwellingSummary(
   dwelling: Monitor[DwellingCommand], individuals: Vector[Monitor[IndividualCommand]], 
   vacant$: Option[Boolean]
 ) {
+  override def toString: String = {
+    s"""overall status: ${isComplete}""" + "\n" +
+    s"""${dwelling.toString}\n${individuals.map(x => x.toString).mkString("\n")}"""
+  }
+
   /**
    * Whether or not the overall case is complete.
    */

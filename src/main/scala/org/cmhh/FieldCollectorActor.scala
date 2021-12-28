@@ -2,6 +2,7 @@ package org.cmhh
 
 import akka.actor.typed.scaladsl.{Behaviors, LoggerOps, ActorContext}
 import akka.actor.typed.{ActorRef, Behavior}
+import com.typesafe.config.Config
 import java.io.File
 import java.time.LocalDateTime
 import scala.util.{Try, Success, Failure}
@@ -13,6 +14,7 @@ import scala.util.{Try, Success, Failure}
  */
 object FieldCollectorActor {
   import messages._
+  import implicits.{random, router, conf}
 
   /**
    * Actor behavior
@@ -33,8 +35,13 @@ object FieldCollectorActor {
 private class FieldCollectorActor (
   id: Int, address: String, location: Coordinates, 
   eventRecorder: ActorRef[messages.EventRecorderCommand], context: ActorContext[messages.FieldCollectorCommand]
-) {    
+)(implicit val random: Rand, val router: Router, conf: Config) {    
   import messages._
+
+  private val CONNECT_TIMEOUT = conf.getInt("router-settings.connect-timeout")
+  private val READ_TIMEOUT = conf.getInt("router-settings.read-timeout")
+  private val AVE_SPEED = conf.getDouble("router-settings.average-speed")
+  private val RATEUP = conf.getDouble("router-settings.rateup")
 
   /**
    * Actor behavior
@@ -56,13 +63,16 @@ private class FieldCollectorActor (
       // contact sorted cases one-by-one, send a NextCase message to self after each is completed.
       case RunDay(dt) =>
         val activeCases: List[ActorRef[DwellingCommand]] = config.getActiveDwellings
-        if (activeCases.size == 0) Behaviors.same else {
+        if (activeCases.size == 0) {
+          behavior(config.clearWork)
+        } else {
           val locations = location :: activeCases.map(k => config.cases(k).location).toList
 
-          val path: List[(Coordinates, Coordinates, Double, Double)] = Router.trip(locations) match {
-            case Success(p) => p.dropRight(1)
-            case Failure(e) => Router.trip0(locations).dropRight(1)
-          } 
+          val path: List[(Coordinates, Coordinates, Double, Double)] = 
+            router.trip(locations, CONNECT_TIMEOUT, READ_TIMEOUT) match {
+              case Success(p) => p.dropRight(1)
+              case Failure(e) => router.trip0(locations, AVE_SPEED, RATEUP).dropRight(1)
+            } 
 
           val work: List[(Double, Double, ActorRef[DwellingCommand])] = path.map(x => {
             val coords = x._2
@@ -71,7 +81,7 @@ private class FieldCollectorActor (
           })
           
           context.self ! NextItem(dt)
-          behavior(config.setWorkload(work).setTime(dt))
+          behavior(config.clearWork.setWorkload(work).setTime(dt))
         }
       case DwellingRefusal(ref) =>
         eventRecorder ! Interview(context.self.toString, ref.toString, ref.toString, config.time.get, "REFUSAL")
@@ -107,9 +117,9 @@ private class FieldCollectorActor (
         )
       case IndividualRefusal(ref, href) =>
         eventRecorder ! Interview(context.self.toString, href.toString, ref.toString, config.time.get, "REFUSAL")
-        val newtime: LocalDateTime = config.time.map(_.plusSeconds(60 * 1)).get
-
-        config.nextIndividual match {
+        val newtime: LocalDateTime = config.time.map(_.plusSeconds(60 * 1)).get // put a configured duration here ..................//
+        
+        config.nextIndividual(ref) match {
           case None =>
             context.self ! NextItem(newtime)
           case Some(nxt) =>
@@ -126,7 +136,7 @@ private class FieldCollectorActor (
         eventRecorder ! Interview(context.self.toString, href.toString, ref.toString, config.time.get, "NONCONTACT")
         val newtime: LocalDateTime = config.time.map(_.plusSeconds(60 * 1)).get
         
-        config.nextIndividual match {
+        config.nextIndividual(ref) match {
           case None =>
             context.self ! NextItem(newtime)
           case Some(nxt) =>
@@ -144,7 +154,7 @@ private class FieldCollectorActor (
         eventRecorder ! IndividualData(ref.toString, href.toString, response)
         val newtime: LocalDateTime = config.time.map(_.plusSeconds(random.individualDuration)).get
         
-        config.nextIndividual match {
+        config.nextIndividual(ref) match {
           case None =>
             context.self ! NextItem(newtime)
           case Some(nxt) =>
@@ -161,56 +171,88 @@ private class FieldCollectorActor (
       // included in the request is an estimated arrivale time--
       // we calculate the drive time from current location to next, and add to current time.
       case NextItem(datetime) =>
-        if (config.workload.size == 0 | datetime.getHour >= 18) {
+        // invariant:
+        // workload is contains previously worked on item at head
+        // if currentDwelling is None, then no work has been done in the current day
+
+        // return home if after 6pm.  
+        // this is crude, and should be based on actual hours accumulated in a day.
+        if (datetime.getHour >= 18) {
           config.getLocation match {
             case Some(location) => 
               context.self ! GoHome(datetime, location)
               Behaviors.same
             case None =>
-              context.log.error("Missing location.  Cannot plan route home.")
+              context.log.error("(1) Missing location.  Cannot plan route home.")
               behavior(
                 config.clearWork
               )
           }
-        } else {
-          val workloadItem = config.nextWorkloadItem
-          val nxt = workloadItem._3
-          val eta: LocalDateTime = datetime.plusSeconds(workloadItem._2.toLong)
-
-          val origin = config.currentDwelling match {
-            case Some(ref) => config.getLocation(ref)
-            case _ => location
+        } else {        
+          val workloadItem = config.currentDwelling match {
+            case None => config.nextWorkloadItem
+            case Some(ref) => config.nextWorkloadItem(ref)
           }
-          
-          val destination = config.getLocation(nxt)
-          eventRecorder ! Trip(context.self.toString, datetime, eta, workloadItem._1, origin, destination)
-          
-          if (!config.summaries(nxt).dwelling.complete) {
-            nxt ! AttemptInterview(eta, context.self)
-            behavior(
-              config
-                .popWorkloadItem
-                .setCurrentDwelling(nxt)
-                .setCurrentIndividuals(List.empty)
-                .setTime(eta)
-            )
-          } else {
-            val resp = config.getActiveIndividuals(nxt)
-            resp.head ! AttemptInterview(eta, context.self)
-            behavior(
-              config
-                .popWorkloadItem
-                .setCurrentDwelling(nxt)
-                .setCurrentIndividuals(resp)
-                .setTime(eta)
-            )
+
+          workloadItem match {
+            case None => {
+              config.getLocation match {
+                case Some(location) => 
+                  context.self ! GoHome(datetime, location)
+                  Behaviors.same
+                case None =>
+                  context.log.error(s"""(2) Missing location @ ${datetime}.  Cannot plan route home.""")
+                  behavior(config.clearWork)
+              }
+            }
+            case Some((distance, duration, nxt)) => {
+              val eta: LocalDateTime = datetime.plusSeconds(duration.toLong)
+
+              val origin = config.currentDwelling match {
+                case Some(ref) => config.getLocation(ref)
+                case _ => location
+              }
+              
+              val destination = config.getLocation(nxt)
+              eventRecorder ! Trip(context.self.toString, datetime, eta, distance, origin, destination)
+              
+              if (!config.summaries(nxt).dwelling.complete) {
+                nxt ! AttemptInterview(eta, context.self)
+                behavior(
+                  config
+                    .popWorkloadItem
+                    .setCurrentDwelling(nxt)
+                    .setCurrentIndividuals(List.empty)
+                    .setTime(eta)
+                )
+              } else {
+                val resp = config.getActiveIndividuals(nxt)
+                if (resp.size == 0) {
+                  context.log.error(s"Attempt completed case @ ${datetime} - (${nxt}).  Skipping...")
+                  context.self ! NextItem(datetime)
+                  behavior(
+                    config
+                      .popWorkloadItem
+                  )
+                } else {
+                  resp.head ! AttemptInterview(eta, context.self)
+                  behavior(
+                    config
+                      .popWorkloadItem
+                      .setCurrentDwelling(nxt)
+                      .setCurrentIndividuals(resp)
+                      .setTime(eta)
+                  )
+                }
+              }
+            }
           }
         }
       // clear workload, and calculate the route home.
       case GoHome(datetime, currentLocation) =>
-        val route = Router.route(currentLocation, location) match {
+        val route = router.route(currentLocation, location, CONNECT_TIMEOUT, READ_TIMEOUT) match {
           case Success(r) => r
-          case Failure(e) => Router.route0(currentLocation, location)
+          case Failure(e) => router.route0(currentLocation, location, AVE_SPEED, RATEUP)
         }
 
         val eta = datetime.plusSeconds(route._2.toLong)

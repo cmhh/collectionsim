@@ -8,10 +8,7 @@ import upickle.default._
 /**
  * Calculate trips and routes
  */
-object Router {  
-  private val conf = ConfigFactory.load()
-  private val routingService = conf.getString("routing.url")
-
+case class Router(routingService: String) {  
   /**
    * Route between two locations
    * 
@@ -25,9 +22,10 @@ object Router {
   def route0(
     origin: Coordinates,
     destination: Coordinates,
-    aveSpeed: Int = 60
+    aveSpeed: Double,
+    rateup: Double
   ): (Double, Double) = {
-    val d = origin.distance(destination) * 1.35
+    val d = origin.distance(destination) * rateup
     (d, d / 1000 / aveSpeed * 60 * 60)
   }
 
@@ -45,8 +43,8 @@ object Router {
   def route(
     origin: Coordinates, 
     destination: Coordinates,
-    connectTimeout: Int = 5000,
-    readTimeout: Int = 5000
+    connectTimeout: Int,
+    readTimeout: Int
   ): Try[(Double, Double)] = Try {
     val coords = s"""$origin;$destination"""
     val service = s"${routingService}/route/v1/driving/$coords"
@@ -73,7 +71,7 @@ object Router {
    * @return List of tuples containing each leg of overall trip--coordinate pairs, distance, and minutes.
    */
   def trip0(
-    coordinates: Seq[Coordinates], aveSpeed: Int = 60
+    coordinates: Seq[Coordinates], aveSpeed: Double, rateup: Double
   ): List[(Coordinates, Coordinates, Double, Double)] = {
     def loop(
       coords: Seq[Coordinates], last: Coordinates, accum: List[(Coordinates, Coordinates, Double, Double)]
@@ -81,7 +79,7 @@ object Router {
       if (coords.isEmpty) accum
       else {
         val d = coords.map(x => {
-          val r = route0(last, x, aveSpeed)
+          val r = route0(last, x, aveSpeed, rateup)
           (last, x, r._1, r._2)
         })
         val res = d.minBy(_._3)
@@ -90,7 +88,7 @@ object Router {
     }
 
     val res = loop(coordinates.drop(1), coordinates.head, List.empty)
-    val d = route0(res.last._2, coordinates.head)
+    val d = route0(res.last._2, coordinates.head, aveSpeed, rateup)
     res :+ (res.last._2, coordinates.head, d._1, d._2)
   }
 
@@ -106,8 +104,8 @@ object Router {
    */
   def trip(
     coordinates: Seq[Coordinates],
-    connectTimeout: Int = 5000,
-    readTimeout: Int = 5000
+    connectTimeout: Int,
+    readTimeout: Int
   ): Try[List[(Coordinates, Coordinates, Double, Double)]] = Try {
     val coords = coordinates.map(_.toString).mkString(";")
     val service = s"${routingService}/trip/v1/driving/$coords"

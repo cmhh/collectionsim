@@ -44,7 +44,7 @@ protected class MainConf(args: Array[String]) extends ScallopConf(args) {
 }
 
 /**
- * Basic entrpoint.
+ * Basic entrypoint.
  * 
  * Beware: this is a guide only and may not work quite right for different inputs.
  * Specifically, the program waits for 3 seconds between days, but this could be

@@ -53,14 +53,27 @@ case class FieldCollectorConfig(
   /**
    * Get next work item as (distance, time, actor reference) tuple
    */
-  def nextWorkloadItem: (Double, Double, ActorRef[DwellingCommand]) = 
-    workload.head
+  def nextWorkloadItem: Option[(Double, Double, ActorRef[DwellingCommand])] = 
+    if (workload.size == 0) None else Some(workload.head)
+
+  def nextWorkloadItem(ref: ActorRef[DwellingCommand]): Option[(Double, Double, ActorRef[DwellingCommand])] = {
+    val w = workload.filter(x => x._3 != ref)
+    if (w.size == 0) None else Some(w.head)
+  }
 
   /**
    * Get next individual from workload
    */
   def nextIndividual: Option[ActorRef[IndividualCommand]] = 
     if (currentIndividuals.size == 0) None else Some(currentIndividuals.head)
+
+  /**
+   * Get next individual from workload that isn't a specific individual
+   */
+  def nextIndividual(ref: ActorRef[IndividualCommand]): Option[ActorRef[IndividualCommand]] = {
+    val ind = currentIndividuals.filter(_ != ref)
+    if (ind.size == 0) None else Some(ind.head)
+  }
 
   /**
    * Return a list of active dwellings, i.e. incomplete dwelling cases

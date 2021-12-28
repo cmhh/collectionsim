@@ -2,9 +2,8 @@ package org.cmhh
 
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors, LoggerOps}
 import akka.actor.typed.{ActorRef, Behavior}
+import com.typesafe.config.Config
 import java.io.File
-import sex._
-import demographics._
 import java.time.LocalDate
 /**
  * Dwelling actor.
@@ -13,6 +12,7 @@ import java.time.LocalDate
  */
 object DwellingActor {
   import messages._
+  import implicits.{random, conf}
 
   /**
    * Actor behavior
@@ -33,8 +33,9 @@ private class DwellingActor(
   id: Int, address: String, location: Coordinates,
   eventRecorder: ActorRef[messages.EventRecorderCommand],
   context: ActorContext[messages.DwellingCommand]
-) {
+)(implicit val random: Rand, val conf: Config) {
   import messages._
+  import categories._
 
   /**
    * Placeholder for household-level questionnaire.
@@ -42,7 +43,9 @@ private class DwellingActor(
   override def toString = random.string(50)
 
   private val residents: List[ActorRef[IndividualCommand]] = 
-      if (scala.util.Random.nextDouble() < 0.1) List.empty else spawnResidents(context)
+      if (scala.util.Random.nextDouble() < conf.getDouble("collection-settings.household.prob-empty")) 
+        List.empty 
+      else spawnResidents(context)
 
   /**
    * Actor behavior
@@ -51,28 +54,28 @@ private class DwellingActor(
    */
   private def behavior(responded: Boolean): Behavior[DwellingCommand] = Behaviors.receiveMessage { message =>
     message match {
-      // respond to request for interview
       case m: AttemptInterview =>
         val r = scala.util.Random.nextDouble()
+        val p = Vector(
+          conf.getDouble("collection-settings.household.prob-refusal"),
+          conf.getDouble("collection-settings.household.prob-noncontact"),
+          conf.getDouble("collection-settings.household.prob-response")
+        ).scanLeft(0.0)(_ + _).drop(1)
         if (residents.size == 0) {
           // assume we can identify empty dwellings with certainty.
           // not reasonable in practice, but...
           m.replyTo ! DwellingEmpty(context.self)
           Behaviors.same
         }
-        else if (r < 0.1) {
-          // refuse with prob 0.1
+        else if (r < p(0)) {
           m.replyTo ! DwellingRefusal(context.self)
           Behaviors.same
         }
-        else if (r < 0.3) {
-          // non-contact with prob 0.2
+        else if (r < p(1)) {
           m.replyTo ! DwellingNoncontact(context.self)
           Behaviors.same
         } 
         else {
-          // respond with prob 0.7
-          // send 'completed questionnaire', and pointers to each individual to area coordinator
           m.replyTo ! DwellingResponse(context.self, toString, residents)
           behavior(true)
         }
