@@ -44,20 +44,42 @@ dwelling-settings {
 }
 
 collection-settings {
+  collector {
+    max-cases = 50
+    max-daily-work-minutes = 500
+  }
   household {
-    prob-empty = 0.1
-    prob-refusal = 0.1
-    prob-noncontact = 0.2
-    prob-response = 0.7
-    duration-mean = 6
-    duration-stdev = 1
+    proportion-empty = 0.1
+    probs {
+      refusal = 0.1
+      noncontact = 0.2
+      response = 0.7
+    }
+    duration {
+      empty-mean = 3
+      empty-stdev = 0.5
+      refusal-mean = 3
+      refusal-stdev = 0.5
+      noncontact-mean = 3
+      noncontact-stdev = 0.5
+      response-mean = 6
+      response-stdev = 1
+    }
   }
   individual {
-    prob-refusal = 0.1
-    prob-noncontact = 0.2
-    prob-response = 0.7
-    duration-mean = 6
-    duration-stdev = 1
+    probs {
+      refusal = 0.1
+      noncontact = 0.2
+      response = 0.7
+    }
+    duration {
+      refusal-mean = 3
+      refusal-stdev = 0.5
+      noncontact-mean = 3
+      noncontact-stdev = 0.5
+      response-mean = 6
+      response-stdev = 1
+    }
   }
 }
 
@@ -165,7 +187,7 @@ DBI::dbDisconnect(db1)
 DBI::dbDisconnect(db2)
 ```
 ```plaintext
-[1] 1.52259
+[1] 1.481211
 ```
 
 More examples to come...

@@ -42,6 +42,7 @@ private class FieldCollectorActor (
   private val READ_TIMEOUT = conf.getInt("router-settings.read-timeout")
   private val AVE_SPEED = conf.getDouble("router-settings.average-speed")
   private val RATEUP = conf.getDouble("router-settings.rateup")
+  private val MAX_MINS = conf.getDouble("collection-settings.collector.max-daily-work-minutes")
 
   /**
    * Actor behavior
@@ -85,26 +86,30 @@ private class FieldCollectorActor (
         }
       case DwellingRefusal(ref) =>
         eventRecorder ! Interview(context.self.toString, ref.toString, ref.toString, config.time.get, "REFUSAL")
-        val newtime: LocalDateTime = config.time.map(_.plusSeconds(60 * 1)).get
+        val duration = random.dwellingRefusalDuration
+        val newtime: LocalDateTime = config.time.map(_.plusSeconds(duration)).get
         context.self ! NextItem(newtime)
-        behavior(config.setDwellingRefusal(ref))
+        behavior(config.setDwellingRefusal(ref).incrementMins(duration / 60.0))
       case DwellingNoncontact(ref) =>
         eventRecorder ! Interview(context.self.toString, ref.toString, ref.toString, config.time.get, "NONCONTACT")
-        val newtime: LocalDateTime = config.time.map(_.plusSeconds(60 * 1)).get
+        val duration = random.dwellingNoncontactDuration
+        val newtime: LocalDateTime = config.time.map(_.plusSeconds(duration)).get
         context.self ! NextItem(newtime)
-        behavior(config.setDwellingNoncontact(ref))
+        behavior(config.setDwellingNoncontact(ref).incrementMins(duration / 60.0))
       case DwellingEmpty(ref) =>
         eventRecorder ! Interview(context.self.toString, ref.toString, ref.toString, config.time.get, "EMPTY")
-        val newtime: LocalDateTime = config.time.map(_.plusSeconds(60 * 1)).get
+        val duration = random.dwellingEmptyDuration
+        val newtime: LocalDateTime = config.time.map(_.plusSeconds(duration)).get
         context.self ! NextItem(newtime)
-        behavior(config.setDwellingVacant(ref))
+        behavior(config.setDwellingVacant(ref).incrementMins(duration / 60.0))
       // a dwelling will be vacant or not.  if vacant, move to next case.
       // if a dwelling is not vacant, the dwelling will reply with the list of individuals
       // the individuals will then be contacted one-by-one before moving to the next case.
       case DwellingResponse(ref, response, cases) =>
         eventRecorder ! Interview(context.self.toString, ref.toString, ref.toString, config.time.get, "RESPONSE")
         eventRecorder ! DwellingData(context.self.toString, response)
-        val newtime: LocalDateTime = config.time.map(_.plusSeconds(random.dwellingDuration)).get
+        val duration = random.dwellingResponseDuration
+        val newtime: LocalDateTime = config.time.map(_.plusSeconds(duration)).get
         cases.head ! AttemptInterview(newtime, context.self)
 
         behavior(
@@ -114,10 +119,12 @@ private class FieldCollectorActor (
             .setCurrentDwelling(ref)
             .setCurrentIndividuals(cases) 
             .setTime(newtime)
+            .incrementMins(duration / 60.0)
         )
       case IndividualRefusal(ref, href) =>
         eventRecorder ! Interview(context.self.toString, href.toString, ref.toString, config.time.get, "REFUSAL")
-        val newtime: LocalDateTime = config.time.map(_.plusSeconds(60 * 1)).get // put a configured duration here ..................//
+        val duration = random.individualRefusalDuration
+        val newtime: LocalDateTime = config.time.map(_.plusSeconds(duration)).get 
         
         config.nextIndividual(ref) match {
           case None =>
@@ -131,10 +138,12 @@ private class FieldCollectorActor (
             .setIndividualRefusal(ref, href)
             .popIndividual(ref)
             .setTime(newtime)
+            .incrementMins(duration / 60.0)
         )
       case IndividualNoncontact(ref, href) =>
         eventRecorder ! Interview(context.self.toString, href.toString, ref.toString, config.time.get, "NONCONTACT")
-        val newtime: LocalDateTime = config.time.map(_.plusSeconds(60 * 1)).get
+        val duration = random.individualNoncontactDuration
+        val newtime: LocalDateTime = config.time.map(_.plusSeconds(duration)).get
         
         config.nextIndividual(ref) match {
           case None =>
@@ -148,11 +157,13 @@ private class FieldCollectorActor (
             .setIndividualNoncontact(ref, href)
             .popIndividual(ref)
             .setTime(newtime)
+            .incrementMins(duration / 60.0)
         )
       case IndividualResponse(ref, href, response) =>
         eventRecorder ! Interview(context.self.toString, href.toString, ref.toString, config.time.get, "RESPONSE")
         eventRecorder ! IndividualData(ref.toString, href.toString, response)
-        val newtime: LocalDateTime = config.time.map(_.plusSeconds(random.individualDuration)).get
+        val duration = random.individualResponseDuration
+        val newtime: LocalDateTime = config.time.map(_.plusSeconds(duration)).get
         
         config.nextIndividual(ref) match {
           case None =>
@@ -166,18 +177,16 @@ private class FieldCollectorActor (
             .setIndividualResponse(ref, href)
             .popIndividual(ref)
             .setTime(newtime)
+            .incrementMins(duration / 60.0)
         )
       // send a request to the next case in the list of work items.
       // included in the request is an estimated arrivale time--
       // we calculate the drive time from current location to next, and add to current time.
       case NextItem(datetime) =>
         // invariant:
-        // workload is contains previously worked on item at head
+        // workload contains previously worked on item at head
         // if currentDwelling is None, then no work has been done in the current day
-
-        // return home if after 6pm.  
-        // this is crude, and should be based on actual hours accumulated in a day.
-        if (datetime.getHour >= 18) {
+        if (config.dayMins >= MAX_MINS) {
           config.getLocation match {
             case Some(location) => 
               context.self ! GoHome(datetime, location)
@@ -224,6 +233,8 @@ private class FieldCollectorActor (
                     .setCurrentDwelling(nxt)
                     .setCurrentIndividuals(List.empty)
                     .setTime(eta)
+                    .incrementKms(distance / 1000.0)
+                    .incrementMins(duration / 60.0)
                 )
               } else {
                 val resp = config.getActiveIndividuals(nxt)
@@ -233,6 +244,7 @@ private class FieldCollectorActor (
                   behavior(
                     config
                       .popWorkloadItem
+                      .incrementKms(distance / 1000.0)
                   )
                 } else {
                   resp.head ! AttemptInterview(eta, context.self)
@@ -242,6 +254,8 @@ private class FieldCollectorActor (
                       .setCurrentDwelling(nxt)
                       .setCurrentIndividuals(resp)
                       .setTime(eta)
+                      .incrementKms(distance / 1000.0)
+                      .incrementMins(duration / 60.0)
                   )
                 }
               }

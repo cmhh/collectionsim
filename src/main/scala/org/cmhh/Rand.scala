@@ -14,13 +14,23 @@ case class Rand()(implicit conf: Config) {
   import categories._
   import scala.util.Random
 
-  val PROP_MALE = conf.getDouble("demographic-settings.proportion-male")
-  val MAX_AGE = conf.getInt("demographic-settings.max-age")
-  val MIN_AGE_COUPLE = conf.getInt("demographic-settings.min-age-couple")
-  val HHLD_DURATION_MEAN = conf.getInt("collection-settings.household.duration-mean")
-  val HHLD_DURATION_STDEV = conf.getInt("collection-settings.household.duration-stdev")
-  val IND_DURATION_MEAN = conf.getInt("collection-settings.individual.duration-mean")
-  val IND_DURATION_STDEV = conf.getInt("collection-settings.individual.duration-stdev")
+  private val PROP_MALE = conf.getDouble("demographic-settings.proportion-male")
+  private val MAX_AGE = conf.getInt("demographic-settings.max-age")
+  private val MIN_AGE_COUPLE = conf.getInt("demographic-settings.min-age-couple")
+  private val HHLD_EMPTY_DURATION_MEAN = conf.getInt("collection-settings.household.duration.empty-mean")
+  private val HHLD_EMPTY_DURATION_STDEV = conf.getInt("collection-settings.household.duration.empty-stdev")
+  private val HHLD_REFUSAL_DURATION_MEAN = conf.getInt("collection-settings.household.duration.refusal-mean")
+  private val HHLD_REFUSAL_DURATION_STDEV = conf.getInt("collection-settings.household.duration.refusal-stdev")
+  private val HHLD_NONCONTACT_DURATION_MEAN = conf.getInt("collection-settings.household.duration.noncontact-mean")
+  private val HHLD_NONCONTACT_DURATION_STDEV = conf.getInt("collection-settings.household.duration.noncontact-stdev")
+  private val HHLD_RESPONSE_DURATION_MEAN = conf.getInt("collection-settings.household.duration.response-mean")
+  private val HHLD_RESPONSE_DURATION_STDEV = conf.getInt("collection-settings.household.duration.response-stdev")
+  private val IND_REFUSAL_DURATION_MEAN = conf.getInt("collection-settings.individual.duration.refusal-mean")
+  private val IND_REFUSAL_DURATION_STDEV = conf.getInt("collection-settings.individual.duration.refusal-stdev")
+  private val IND_NONCONTACT_DURATION_MEAN = conf.getInt("collection-settings.individual.duration.noncontact-mean")
+  private val IND_NONCONTACT_DURATION_STDEV = conf.getInt("collection-settings.individual.duration.noncontact-stdev")
+  private val IND_RESPONSE_DURATION_MEAN = conf.getInt("collection-settings.individual.duration.response-mean")
+  private val IND_RESPONSE_DURATION_STDEV = conf.getInt("collection-settings.individual.duration.response-stdev")
 
   /**
    * Random normal.
@@ -31,18 +41,53 @@ case class Rand()(implicit conf: Config) {
   def normal(mean: Double, std: Double) = Random.nextGaussian() * std + mean
 
   /**
+   * Random number representing time spent on empty dwelling
+   */
+  def dwellingEmptyDuration: Int = math.max(0, math.round(
+    normal(HHLD_EMPTY_DURATION_MEAN, HHLD_EMPTY_DURATION_STDEV) * 60
+  ).toInt)
+
+  /**
+   * Random number representing time spent on dwelling refusal
+   */
+  def dwellingRefusalDuration: Int = math.max(0, math.round(
+    normal(HHLD_REFUSAL_DURATION_MEAN, HHLD_REFUSAL_DURATION_STDEV) * 60
+  ).toInt)
+
+  /**
+   * Random number representing time spent on dwelling non-contact
+   */
+  def dwellingNoncontactDuration: Int = math.max(0, math.round(
+    normal(HHLD_NONCONTACT_DURATION_MEAN, HHLD_NONCONTACT_DURATION_STDEV) * 60
+  ).toInt)
+
+  /**
    * Random number representing duration of dwelling questionnaire in seconds
    */
-  def dwellingDuration: Int = math.round(
-    normal(HHLD_DURATION_MEAN, HHLD_DURATION_STDEV) * 60
-  ).toInt
+  def dwellingResponseDuration: Int = math.max(0, math.round(
+    normal(HHLD_RESPONSE_DURATION_MEAN, HHLD_RESPONSE_DURATION_STDEV) * 60
+  ).toInt)
+
+  /**
+   * Random number representing time spent on individual refusal
+   */
+  def individualRefusalDuration: Int = math.max(0, math.round(
+    normal(IND_REFUSAL_DURATION_MEAN, IND_REFUSAL_DURATION_STDEV) * 60
+  ).toInt)
+
+  /**
+   * Random number representing time spent on individual non-contact
+   */
+  def individualNoncontactDuration: Int = math.max(0, math.round(
+    normal(IND_NONCONTACT_DURATION_MEAN, IND_NONCONTACT_DURATION_STDEV) * 60
+  ).toInt)
 
   /**
    * Random number representing duration of individual questionnaire in seconds
    */
-  def individualDuration: Int = math.round(
-    normal(IND_DURATION_MEAN, IND_DURATION_STDEV) * 60
-  ).toInt
+  def individualResponseDuration: Int = math.max(0, math.round(
+    normal(IND_RESPONSE_DURATION_MEAN, IND_RESPONSE_DURATION_STDEV) * 60
+  ).toInt)
 
   /**
    * Random male name

@@ -47,7 +47,8 @@ case class FieldCollectorConfig(
    */
   def reset = 
     this.copy(
-      workload = List.empty, currentDwelling = None, currentIndividuals = List.empty, time = None
+      workload = List.empty, currentDwelling = None, currentIndividuals = List.empty, time = None,
+      dayKms = 0, dayMins = 0
     )
 
   /**
@@ -175,6 +176,20 @@ case class FieldCollectorConfig(
   def setTime(time$: Option[LocalDateTime]) = this.copy(time = time$)
 
   /**
+   * Increment kilimeters.
+   * 
+   * @param kms minutes to add
+   */
+  def incrementKms(kms: Double) = this.copy(dayKms = this.dayKms + kms)
+
+  /**
+   * Increment minutes.
+   * 
+   * @param mins minutes to add
+   */
+  def incrementMins(mins: Double) = this.copy(dayMins = this.dayMins + mins)
+
+  /**
    * Mark dwelling as a refusal.
    * 
    * @param ref dwelling actor reference
@@ -254,7 +269,8 @@ case class FieldCollectorConfig(
    */
   def clearWork = 
     this.copy(
-      workload = List.empty, currentDwelling = None, currentIndividuals = List.empty
+      workload = List.empty, currentDwelling = None, currentIndividuals = List.empty,
+      dayKms = 0, dayMins = 0
     )
 }
 

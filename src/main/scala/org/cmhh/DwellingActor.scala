@@ -43,7 +43,7 @@ private class DwellingActor(
   override def toString = random.string(50)
 
   private val residents: List[ActorRef[IndividualCommand]] = 
-      if (scala.util.Random.nextDouble() < conf.getDouble("collection-settings.household.prob-empty")) 
+      if (scala.util.Random.nextDouble() < conf.getDouble("collection-settings.household.proportion-empty")) 
         List.empty 
       else spawnResidents(context)
 
@@ -57,9 +57,9 @@ private class DwellingActor(
       case m: AttemptInterview =>
         val r = scala.util.Random.nextDouble()
         val p = Vector(
-          conf.getDouble("collection-settings.household.prob-refusal"),
-          conf.getDouble("collection-settings.household.prob-noncontact"),
-          conf.getDouble("collection-settings.household.prob-response")
+          conf.getDouble("collection-settings.household.probs.refusal"),
+          conf.getDouble("collection-settings.household.probs.noncontact"),
+          conf.getDouble("collection-settings.household.probs.response")
         ).scanLeft(0.0)(_ + _).drop(1)
         if (residents.size == 0) {
           // assume we can identify empty dwellings with certainty.

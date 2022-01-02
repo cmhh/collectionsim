@@ -50,9 +50,9 @@ private class IndividualActor(
       case m: AttemptInterview =>
         val r = scala.util.Random.nextDouble()
         val p = Vector(
-          conf.getDouble("collection-settings.individual.prob-refusal"),
-          conf.getDouble("collection-settings.individual.prob-noncontact"),
-          conf.getDouble("collection-settings.individual.prob-response")
+          conf.getDouble("collection-settings.individual.probs.refusal"),
+          conf.getDouble("collection-settings.individual.probs.noncontact"),
+          conf.getDouble("collection-settings.individual.probs.response")
         ).scanLeft(0.0)(_ + _).drop(1)
         if (r < p(0)) {
           m.replyTo ! IndividualRefusal(context.self, parent)

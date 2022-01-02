@@ -36,6 +36,7 @@ private class AreaCoordinator(
   private val READ_TIMEOUT = conf.getInt("router-settings.read-timeout")
   private val AVE_SPEED = conf.getDouble("router-settings.average-speed")
   private val RATEUP = conf.getDouble("router-settings.rateup")
+  private val MAX_CASES = conf.getDouble("collection-settings.collector.max-cases")
 
   /**
    * Actor behavior
@@ -56,7 +57,7 @@ private class AreaCoordinator(
       // decide which collector to send Dwelling to
       // choose closest collector who is under the work threshold
       case m: Dwelling => 
-        val available1 = collectors.filter(collector => workloads(collector._1) < 50)
+        val available1 = collectors.filter(collector => workloads(collector._1) < MAX_CASES)
         val available2 = if (available1.size > 0) available1 else collectors
         val distances = available2.map(collector => {
           val d = router.route(m.location, collector._2.location, CONNECT_TIMEOUT, READ_TIMEOUT) match {
