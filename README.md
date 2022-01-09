@@ -190,4 +190,17 @@ DBI::dbDisconnect(db2)
 [1] 1.481211
 ```
 
-More examples to come...
+Similarly, we could create some interactive visuals, and several R Shiny applications are included in a [`shiny_apps`](./shiny_apps) folder for illustration:
+
+app name              | description
+----------------------|-------------------------------------------------------------------
+`collectors`          | present all field collectors on a leaflet map.
+`dwellings`           | present all dwellings on a leaflet map.
+`dwelling_assignment` | visualise assignment of dwellings to collectors on a leaflet map.
+`trips`               | view trips data by day on a leaflet map
+
+For example, screen grabs of the `trips` application (with and without a routing service used) are as follows:
+
+![](img/trips1.webp)
+
+![](img/trips2.webp)

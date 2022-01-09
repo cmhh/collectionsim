@@ -1,0 +1,4 @@
+default:
+  db: "../../collectionsim1.db"
+  service: "http://localhost:5001/route/v1"
+  route: TRUE

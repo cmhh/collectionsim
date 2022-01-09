@@ -1,0 +1,42 @@
+body > div:nth-child(2) {
+  display: block;
+  position: absolute;
+  top: 71px;
+  bottom: 0;
+  overflow: hide;
+  padding: 0;
+}
+
+@media only screen and (max-width: 575px) {
+  body > div:nth-child(2) {
+    display: block;
+    position: absolute;
+    top: 147px;
+    bottom: 0;
+    overflow: hide;
+    padding: 0;
+  }
+}
+
+div.tab-content {
+  height: 100%;
+  max-width: 100%;
+}
+
+div.tab-content > div.tab-pane {
+  height: 100%;
+}
+
+div.content {
+  position: absolute;
+  top: 1em;
+  left: 1em;
+  right: 1em;
+  bottom: 1em;
+  /*
+  box-sizing: border-box;
+  padding: 15px;
+  max-height: 100%;
+  max-width: 100%;
+  */
+}
